@@ -1,0 +1,13 @@
+-- DAX measures — create a blank table "_Measures" and add these
+Total GMV           = SUM ( OrderItems[price] )
+Total Freight       = SUM ( OrderItems[freight_value] )
+Freight % of GMV    = DIVIDE ( [Total Freight], [Total GMV] )
+Orders              = DISTINCTCOUNT ( OrderItems[order_id] )
+Avg Freight / Order = DIVIDE ( [Total Freight], [Orders] )
+Avg Delivery Days   = AVERAGE ( Orders[DeliveryDays] )
+On-Time %           = DIVIDE ( CALCULATE ( [Orders], Orders[IsOnTime] = 1 ), [Orders] )
+Freight MoM %       =
+VAR prev = CALCULATE ( [Total Freight], DATEADD ( Dates[Date], -1, MONTH ) )
+RETURN DIVIDE ( [Total Freight] - prev, prev )
+Freight per Kg      = DIVIDE ( [Total Freight], SUMX ( OrderItems, RELATED ( Products[product_weight_g] ) ) / 1000 )
+Freight % of Price  = DIVIDE ( [Total Freight], [Total GMV] )   -- use with category context

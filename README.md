@@ -1,40 +1,57 @@
-# Cost-to-Serve Teardown — Brazilian E-Commerce (Olist, 100k+ orders)
+# Cost-to-Serve Teardown — Brazilian E-Commerce (Olist, ~100k orders)
 
 **Author:** Ichwan Ramadhanil · Cost Planning Engineer, Hino Motors (Toyota Group)
-**Stack:** SQL (SQLite), Python (loader only)
-**Goal:** Decompose delivery-cost drivers in a real e-commerce logistics dataset and identify the top-3 cost levers — the same variance-analysis workflow I run on truck platform costs at Hino, applied to cost-to-serve.
+**Stack:** SQL (SQLite) · Python (loader) · Power BI (dashboard — see `/dashboard`)
+**Goal:** Decompose delivery-cost drivers in a real e-commerce logistics dataset and quantify the top-3 cost levers — the same variance-analysis workflow I run on truck platform costs at Hino, applied to cost-to-serve.
 
 ## Dataset
-[Olist Brazilian E-Commerce Public Dataset](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) — ~100k real orders (2016–2018) with order items, freight values, product weights/categories, customer and seller locations, delivery timestamps. Free Kaggle account required.
+[Olist Brazilian E-Commerce Public Dataset](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) — 99,441 real orders / 112,650 order items (2016–2018) with freight values, product weights/categories, customer and seller locations, and delivery timestamps.
 
-## How to run
-```bash
-# 1. Download the dataset from Kaggle and unzip all CSVs into ./data/
-# 2. Load into SQLite:
-python load_data.py          # creates olist.db
-# 3. Run the analyses in order:
-sqlite3 olist.db < sql/01_data_quality.sql
-sqlite3 olist.db < sql/02_freight_baseline.sql
-sqlite3 olist.db < sql/03_cost_by_route.sql
-sqlite3 olist.db < sql/04_cost_by_category.sql
-sqlite3 olist.db < sql/05_speed_vs_cost.sql
-sqlite3 olist.db < sql/06_top_cost_levers.sql
-```
+## Headline results (computed from the full dataset — see `/results`)
+
+| Metric | Value |
+|---|---|
+| Delivered orders analyzed | 96,478 |
+| GMV | R$13.22M |
+| Total freight | R$2.20M — **16.6% of GMV** |
+| Avg freight per order | R$22.79 |
+| Freight burden, cheapest-basket decile | **98.3% of basket value** (avg basket R$29) vs 5.1% for the largest baskets |
+
+## The top-3 cost levers, quantified
+
+**Lever 1 — Interstate lane concentration (75.6% of freight spend).**
+70,331 interstate shipments average **R$23.63** vs **R$13.45** intrastate — a **+76% premium** on three-quarters of total spend. The slowest delivery quartile (avg 23.8 days) also pays **R$28.16** avg freight vs R$16.55 in the fastest (4.5 days): long lanes are slow *and* expensive, so regionalization/consolidation improves cost and customer experience simultaneously.
+
+**Lever 2 — Light, low-price categories with broken freight economics.**
+Electronics and telephony items carry freight equal to **68.4%** and **50.8% of item price** (vs ~31% network average) at R$75–84 freight per kg — pricing/packaging/regional-stocking candidates. The worst freight-to-price decile of categories alone accounts for 5.9% of network freight.
+
+**Lever 3 — Split shipments cost 2.1x.**
+Orders fulfilled by multiple sellers ship separately and average **R$46.67 freight vs R$22.47** for single-shipment orders. Consolidating them cuts ~R$24/order on the affected volume.
+
+**Supplier lens (analysis 07) — 22.5% of freight spend is above benchmark.**
+Benchmarking every seller against the **median freight of their own lane** ("should-cost") shows **R$494k of R$2.2M** paid above lane median; the top seller-lane pair alone carries a R$7.5k gap. This is the negotiation agenda a purchasing team would run.
 
 ## Analysis structure
 | # | Question | SQL techniques |
 |---|----------|----------------|
-| 01 | Is the data trustworthy? (row counts, nulls, duplicate orders) | aggregates, GROUP BY/HAVING |
-| 02 | What is baseline freight cost as % of GMV, and its distribution? | CTEs, aggregate stats |
-| 03 | Which shipping lanes (seller state → customer state) drive cost? | joins, CTEs, RANK() window |
-| 04 | Which product categories have the worst freight-per-kg and freight-to-price ratio? | multi-join, NTILE() window |
-| 05 | Do customers pay more freight for slower delivery? (cost vs speed quartiles) | CTEs, NTILE(), date math |
+| 01 | Is the data trustworthy? (row counts, nulls, duplicates) | aggregates, GROUP BY/HAVING |
+| 02 | Baseline freight % of GMV + distribution | CTEs, NTILE() deciles |
+| 03 | Which shipping lanes drive cost? | joins, CTEs, RANK() window |
+| 04 | Which categories have the worst freight economics? | multi-join, NTILE() |
+| 05 | Do customers pay more for slower delivery? | CTEs, NTILE(), date math |
 | 06 | Top-3 cost levers, quantified | everything combined |
+| 07 | Supplier should-cost benchmarking (purchasing view) | window-function medians, temp tables |
 
-## Findings (fill after running — template)
-1. **Lever 1 — Long interstate lanes:** X% of orders ship on the top-10 costliest lanes at an average freight of R$X vs network average R$X → consolidation/regional-stocking opportunity worth ~X% of total freight spend.
-2. **Lever 2 — Heavy, low-price categories:** categories in the worst freight-to-price decile (e.g., furniture, housewares) carry freight equal to X% of item price vs X% network median.
-3. **Lever 3 — Single-item shipments:** X% of multi-item orders ship from multiple sellers separately; combined shipments would reduce per-order freight by ~X%.
+## How to run
+```bash
+# 1. Download the dataset from Kaggle and unzip all CSVs into ./data/
+python load_data.py                       # creates olist.db
+for f in sql/0*.sql; do sqlite3 olist.db < "$f"; done
+```
+Computed outputs are committed under `/results` (monthly KPIs, lane summary, category summary, full query results) so findings are reproducible and inspectable without rerunning.
 
-## Why this project (interview talking point)
-At Hino I decompose product cost into design, procurement and production drivers to hit platform target costs. This project applies the identical method — baseline → segmentation → root cause → quantified countermeasures — to e-commerce cost-to-serve, which is the core work of Amazon's EU Long Term Planning / Transformation Programs teams.
+## Dashboard (`/dashboard`)
+Power BI logistics KPI dashboard on the same data: Power Query ETL script (`powerquery_etl.pq`), DAX measure definitions (`dax_measures.dax`), and build spec. KPIs: Freight % of GMV, Avg Freight/Order, Avg Delivery Days, On-Time %, with lane and category drill-downs — designed as a weekly operational review.
+
+## Why this project
+At Hino I decompose product cost into design, procurement and production drivers to hit platform target costs. This project applies the identical method — baseline → segmentation → root cause → quantified countermeasures — to e-commerce cost-to-serve (the core work of Amazon-style transformation/planning teams), and analysis 07 applies the supplier-benchmarking half of that method (should-cost, gap-to-benchmark, negotiation targets), which is the daily language of automotive purchasing.

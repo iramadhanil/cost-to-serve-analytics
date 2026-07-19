@@ -1,3 +1,5 @@
+> **Status:** ETL (M) script and DAX measures are committed alongside this spec (`powerquery_etl.pq`, `dax_measures.dax`) and aggregate data lives in `/results`. Remaining manual step: assemble the .pbix in Power BI Desktop (~3–4 h) and screenshot both pages into this folder.
+
 # Logistics KPI Dashboard — Power BI Build Spec
 
 **Goal:** a self-refreshing 2-page Power BI dashboard tracking delivery speed and cost-per-order KPIs on the same Olist dataset used in Project 1 — designed to look like a weekly operational review tool, because that is what Amazon STEP/LTP analysts actually build.
