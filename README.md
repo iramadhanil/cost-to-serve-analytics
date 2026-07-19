@@ -23,7 +23,7 @@
 70,331 interstate shipments average **R$23.63** vs **R$13.45** intrastate — a **+76% premium** on three-quarters of total spend. The slowest delivery quartile (avg 23.8 days) also pays **R$28.16** avg freight vs R$16.55 in the fastest (4.5 days): long lanes are slow *and* expensive, so regionalization/consolidation improves cost and customer experience simultaneously.
 
 **Lever 2 — Light, low-price categories with broken freight economics.**
-Electronics and telephony items carry freight equal to **68.4%** and **50.8% of item price** (vs ~31% network average) at R$75–84 freight per kg — pricing/packaging/regional-stocking candidates. The worst freight-to-price decile of categories alone accounts for 5.9% of network freight.
+Electronics and telephony items carry an average item-level freight-to-price ratio of **68.4%** and **50.8%** (vs ~31% network average; on a ratio-of-sums basis they run ~30% — the gap itself is a mix-effect story worth telling in interviews) at R$75–84 freight per kg — pricing/packaging/regional-stocking candidates. The worst freight-to-price decile of categories alone accounts for 5.9% of network freight.
 
 **Lever 3 — Split shipments cost 2.1x.**
 Orders fulfilled by multiple sellers ship separately and average **R$46.67 freight vs R$22.47** for single-shipment orders. Consolidating them cuts ~R$24/order on the affected volume.
@@ -51,7 +51,8 @@ for f in sql/0*.sql; do sqlite3 olist.db < "$f"; done
 Computed outputs are committed under `/results` (monthly KPIs, lane summary, category summary, full query results) so findings are reproducible and inspectable without rerunning.
 
 ## Dashboard (`/dashboard`)
-Power BI logistics KPI dashboard on the same data: Power Query ETL script (`powerquery_etl.pq`), DAX measure definitions (`dax_measures.dax`), and build spec. KPIs: Freight % of GMV, Avg Freight/Order, Avg Delivery Days, On-Time %, with lane and category drill-downs — designed as a weekly operational review.
+**[Live interactive dashboard →](https://iramadhanil.github.io/cost-to-serve-analytics/dashboard/)** — KPI cards (Freight % of GMV, Avg Freight/Order, Avg Delivery Days, On-Time %), monthly trend with year filter, lane and category drill-downs, speed-vs-cost quadrant. Built as a weekly operational review; every number is computed by the SQL pipeline (order-grain, so on-time % is not inflated by multi-item orders).
+The same dashboard is specified for Power BI Desktop: Power Query ETL script (`powerquery_etl.pq`), DAX measures (`dax_measures.dax`), and `BUILD_SPEC.md`.
 
 ## Why this project
 At Hino I decompose product cost into design, procurement and production drivers to hit platform target costs. This project applies the identical method — baseline → segmentation → root cause → quantified countermeasures — to e-commerce cost-to-serve (the core work of Amazon-style transformation/planning teams), and analysis 07 applies the supplier-benchmarking half of that method (should-cost, gap-to-benchmark, negotiation targets), which is the daily language of automotive purchasing.

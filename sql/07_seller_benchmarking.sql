@@ -2,7 +2,7 @@
 -- Question: on the same shipping lane, which sellers ship at above-benchmark freight
 -- cost, and what is the savings opportunity if each were brought to the lane median?
 -- This is supplier should-cost benchmarking applied to e-commerce:
--- the lane median = "should-cost"; the gap vs median = the negotiation agenda.
+-- the lane median = "should-cost", and the gap vs median = the negotiation agenda.
 .headers on
 .mode column
 

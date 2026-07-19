@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logistics KPI Dashboard — Olist Cost-to-Serve</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+  :root { --bg:#0f172a; --card:#1e293b; --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --warn:#f59e0b; --good:#34d399; }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; padding:24px; }
+  h1 { font-size:1.4rem; margin-bottom:4px; }
+  .sub { color:var(--muted); font-size:.85rem; margin-bottom:18px; }
+  .filters { margin-bottom:18px; }
+  .filters button { background:var(--card); color:var(--text); border:1px solid #334155; padding:6px 16px; margin-right:8px; border-radius:6px; cursor:pointer; font-size:.85rem; }
+  .filters button.active { background:var(--accent); color:#0f172a; font-weight:600; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:20px; }
+  .kpi { background:var(--card); border-radius:10px; padding:16px; }
+  .kpi .label { color:var(--muted); font-size:.75rem; text-transform:uppercase; letter-spacing:.05em; }
+  .kpi .value { font-size:1.7rem; font-weight:700; margin-top:6px; }
+  .kpi .note { color:var(--muted); font-size:.72rem; margin-top:4px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .panel { background:var(--card); border-radius:10px; padding:16px; }
+  .panel h2 { font-size:.95rem; margin-bottom:10px; color:var(--text); }
+  .panel .hint { color:var(--muted); font-size:.72rem; margin-top:8px; }
+  .wide { grid-column:1 / -1; }
+  canvas { max-height:300px; }
+  footer { color:var(--muted); font-size:.72rem; margin-top:20px; }
+  @media (max-width:800px){ .grid{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<h1>Logistics KPI Dashboard — Cost-to-Serve (Olist, ~100k orders)</h1>
+<div class="sub">Weekly-operational-review layout · data computed by the SQL pipeline in <a href="https://github.com/iramadhanil/cost-to-serve-analytics" style="color:var(--accent)">this repo</a> · web twin of the Power BI build (<code>BUILD_SPEC.md</code>)</div>
+
+<div class="filters" id="yearFilters">
+  <button data-year="all" class="active">All (2016–18)</button>
+  <button data-year="2017">2017</button>
+  <button data-year="2018">2018</button>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="label">Freight % of GMV</div><div class="value" id="kFr">–</div><div class="note">headline ratio — absolute freight grows with sales</div></div>
+  <div class="kpi"><div class="label">Avg Freight / Order</div><div class="value" id="kAvg">–</div><div class="note">delivered orders only</div></div>
+  <div class="kpi"><div class="label">Avg Delivery Days</div><div class="value" id="kDays">–</div><div class="note">purchase → customer delivery</div></div>
+  <div class="kpi"><div class="label">On-Time %</div><div class="value" id="kOt">–</div><div class="note">vs promised delivery estimate</div></div>
+</div>
+
+<div class="grid">
+  <div class="panel wide">
+    <h2>Freight % of GMV by month (bars = GMV R$k)</h2>
+    <canvas id="trend"></canvas>
+  </div>
+  <div class="panel">
+    <h2>Top lanes by total freight spend (R$k)</h2>
+    <canvas id="lanes"></canvas>
+    <div class="hint">Blue = intrastate, amber = interstate. Interstate = 75.6% of network freight at +76% avg premium.</div>
+  </div>
+  <div class="panel">
+    <h2>Worst categories — avg item freight-to-price %</h2>
+    <canvas id="cats"></canvas>
+    <div class="hint">Light, low-price items: freight can exceed half the item price.</div>
+  </div>
+  <div class="panel wide">
+    <h2>Speed vs cost — delivery-time quartiles</h2>
+    <canvas id="speed"></canvas>
+    <div class="hint">Slow lanes are also expensive lanes: the slowest quartile (23.8 days) pays 70% more freight than the fastest (4.5 days). Regionalization improves both.</div>
+  </div>
+</div>
+
+<footer>Data: Olist Brazilian E-Commerce Public Dataset (Kaggle) · 96,470 delivered orders, 2016–2018 · All figures computed via SQL (see <code>/sql</code>, outputs in <code>/results</code>) · Ichwan Ramadhanil</footer>
+
+<script>
+const MONTHLY = [
+ ["2016-10",265,40325,6166,15.3,19.6,98.9],
+ ["2017-01",750,111798,15684,14.0,12.6,96.9],
+ ["2017-02",1653,234223,37016,15.8,13.2,96.8],
+ ["2017-03",2546,359199,55132,15.3,13.0,94.4],
+ ["2017-04",2303,340670,50143,14.7,14.9,92.1],
+ ["2017-05",3545,489159,77498,15.8,11.3,96.4],
+ ["2017-06",3135,421923,68127,16.1,12.0,96.1],
+ ["2017-07",3872,481605,84695,17.6,11.6,96.6],
+ ["2017-08",4193,554700,91133,16.4,11.1,96.7],
+ ["2017-09",4150,607400,93678,15.4,11.9,94.8],
+ ["2017-10",4478,648248,102869,15.9,11.9,94.7],
+ ["2017-11",7288,987648,165581,16.8,15.2,85.7],
+ ["2017-12",5513,726033,117045,16.1,15.4,91.6],
+ ["2018-01",7069,924645,153242,16.6,14.1,93.4],
+ ["2018-02",6555,826437,139731,16.9,16.9,84.0],
+ ["2018-03",7003,953356,167242,17.5,16.3,78.6],
+ ["2018-04",6798,973534,159345,16.4,11.5,94.7],
+ ["2018-05",6749,977545,151230,15.5,11.4,91.8],
+ ["2018-06",6096,855592,155857,18.2,9.2,98.6],
+ ["2018-07",6156,867486,159800,18.4,9.0,95.5],
+ ["2018-08",6351,838577,146915,17.5,7.7,89.6]
+];
+const LANES = [
+ ["SP→SP",1,467.5,13.20],["SP→RJ",0,191.7,20.39],["SP→MG",0,173.5,20.25],
+ ["SP→RS",0,85.2,20.61],["SP→PR",0,73.8,20.44],["PR→SP",0,64.2,19.21],
+ ["SP→BA",0,63.9,24.32],["MG→SP",0,61.9,21.35],["SP→SC",0,56.4,20.81],["SP→PE",0,38.5,30.91]
+];
+const CATS = [["electronics",68.4],["telephony",50.8],["food_drink",49.2],["constr_tools_garden",41.8],["drinks",41.5]];
+const SPEED = [["Q1 · 4.5d",4.5,16.55],["Q2 · 8.4d",8.4,21.88],["Q3 · 12.7d",12.7,24.45],["Q4 · 23.8d",23.8,28.16]];
+
+Chart.defaults.color = "#94a3b8";
+Chart.defaults.borderColor = "rgba(148,163,184,.15)";
+
+function rowsFor(year){
+  return year === "all" ? MONTHLY : MONTHLY.filter(r => r[0].startsWith(year));
+}
+function updateKpis(year){
+  const rows = rowsFor(year);
+  const gmv = rows.reduce((a,r)=>a+r[2],0), fr = rows.reduce((a,r)=>a+r[3],0), n = rows.reduce((a,r)=>a+r[1],0);
+  const days = rows.reduce((a,r)=>a+r[5]*r[1],0)/n, ot = rows.reduce((a,r)=>a+r[6]*r[1],0)/n;
+  document.getElementById("kFr").textContent = (100*fr/gmv).toFixed(1)+"%";
+  document.getElementById("kAvg").textContent = "R$"+(fr/n).toFixed(2);
+  document.getElementById("kDays").textContent = days.toFixed(1);
+  document.getElementById("kOt").textContent = ot.toFixed(1)+"%";
+}
+let trendChart;
+function drawTrend(year){
+  const rows = rowsFor(year);
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(document.getElementById("trend"), {
+    data: {
+      labels: rows.map(r=>r[0]),
+      datasets: [
+        { type:"line", label:"Freight % of GMV", data: rows.map(r=>r[4]), yAxisID:"y1",
+          borderColor:"#38bdf8", backgroundColor:"#38bdf8", tension:.3, pointRadius:3 },
+        { type:"bar", label:"GMV (R$k)", data: rows.map(r=>Math.round(r[2]/1000)), yAxisID:"y",
+          backgroundColor:"rgba(148,163,184,.35)" }
+      ]
+    },
+    options: { responsive:true, scales:{ y:{position:"left", title:{display:true,text:"GMV R$k"}},
+      y1:{position:"right", grid:{drawOnChartArea:false}, title:{display:true,text:"Freight %"}, suggestedMin:12, suggestedMax:20} } }
+  });
+}
+new Chart(document.getElementById("lanes"), { type:"bar",
+  data:{ labels:LANES.map(l=>l[0]),
+    datasets:[{ label:"Total freight R$k", data:LANES.map(l=>l[2]),
+      backgroundColor:LANES.map(l=>l[1] ? "#38bdf8" : "#f59e0b") }]},
+  options:{ indexAxis:"y", plugins:{legend:{display:false}},
+    scales:{ x:{title:{display:true,text:"R$k"}} } } });
+new Chart(document.getElementById("cats"), { type:"bar",
+  data:{ labels:CATS.map(c=>c[0]),
+    datasets:[{ label:"avg freight-to-price %", data:CATS.map(c=>c[1]), backgroundColor:"#f472b6" }]},
+  options:{ plugins:{legend:{display:false}}, scales:{ y:{title:{display:true,text:"% of item price"}} } } });
+new Chart(document.getElementById("speed"), { type:"scatter",
+  data:{ datasets: SPEED.map((s,i)=>({ label:s[0], data:[{x:s[1], y:s[2]}], pointRadius:9,
+    backgroundColor:["#34d399","#38bdf8","#f59e0b","#ef4444"][i] })) },
+  options:{ scales:{ x:{title:{display:true,text:"avg delivery days"}}, y:{title:{display:true,text:"avg freight R$"}} } } });
+
+document.querySelectorAll("#yearFilters button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    document.querySelectorAll("#yearFilters button").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    updateKpis(b.dataset.year); drawTrend(b.dataset.year);
+  });
+});
+updateKpis("all"); drawTrend("all");
+</script>
+</body>
+</html>
