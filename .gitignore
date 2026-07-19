@@ -1,0 +1,4 @@
+data/
+olist.db
+*.pbix.bak
+.DS_Store
