@@ -51,8 +51,13 @@ for f in sql/0*.sql; do sqlite3 olist.db < "$f"; done
 Computed outputs are committed under `/results` (monthly KPIs, lane summary, category summary, full query results) so findings are reproducible and inspectable without rerunning.
 
 ## Dashboard (`/dashboard`)
-**[Live interactive dashboard →](https://iramadhanil.github.io/cost-to-serve-analytics/dashboard/)** — KPI cards (Freight % of GMV, Avg Freight/Order, Avg Delivery Days, On-Time %), monthly trend with year filter, lane and category drill-downs, speed-vs-cost quadrant. Built as a weekly operational review; every number is computed by the SQL pipeline (order-grain, so on-time % is not inflated by multi-item orders).
-The same dashboard is specified for Power BI Desktop: Power Query ETL script (`powerquery_etl.pq`), DAX measures (`dax_measures.dax`), and `BUILD_SPEC.md`.
+**Power BI:** `logistics_kpi.pbix` — a working Power BI Desktop report (screenshot below). Two imported tables (`orders_flat` at order grain, `items_flat` at item grain), 8 DAX measures, and one page: 4 KPI cards (Freight % of GMV 16.6%, On-Time % 92.2%, Avg Freight/Order R$22.76, Avg Delivery Days 11.9), a monthly Total-Freight trend, Total Freight by customer state, and Freight-%-of-price by category. Order-grain modelling keeps on-time % and avg delivery days from being inflated by multi-item orders.
+
+![Power BI dashboard](dashboard/page1_network_overview.png)
+
+**[Live interactive web version →](https://iramadhanil.github.io/cost-to-serve-analytics/dashboard/)** — the same KPIs and drill-downs as a browser dashboard.
+
+Reproduce: `python dashboard/build_flat_data.py` regenerates the two flat tables from `/data`; the `.pbix` imports them via Power Query. Design notes and DAX in `BUILD_SPEC.md`, `powerquery_etl.pq`, `dax_measures.dax`.
 
 ## Why this project
 At Hino I decompose product cost into design, procurement and production drivers to hit platform target costs. This project applies the identical method — baseline → segmentation → root cause → quantified countermeasures — to e-commerce cost-to-serve (the core work of Amazon-style transformation/planning teams), and analysis 07 applies the supplier-benchmarking half of that method (should-cost, gap-to-benchmark, negotiation targets), which is the daily language of automotive purchasing.

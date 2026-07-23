@@ -2,3 +2,5 @@ data/
 olist.db
 *.pbix.bak
 .DS_Store
+
+dashboard/pbix_data/
